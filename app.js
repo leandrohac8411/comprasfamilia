@@ -198,6 +198,15 @@ $("login-form").onsubmit = async event => {
     $("login-submit").disabled = false;
   }
 };
+$("toggle-password").onclick = () => {
+  const input = $("login-password");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  $("toggle-password").setAttribute("aria-pressed", String(show));
+  $("toggle-password").setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+  $("eye-open").toggleAttribute("hidden", show);
+  $("eye-closed").toggleAttribute("hidden", !show);
+};
 $("logout").onclick = () => {
   if (confirm("Sair da conta neste aparelho?")) signOut(auth);
 };
