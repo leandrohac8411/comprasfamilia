@@ -176,14 +176,18 @@ export default async function handler(req, res) {
 
   const diaadia = (async () => {
     const campaigns = await diaadiaCampaigns(regiao, loja);
-    const matches = [];
+    const matches = [], errors = [];
     await mapLimit(campaigns, 3, async campaign => {
       for (const pdf of campaign.pdfs.slice(0, 2)) {
-        const lines = await pdfLines(pdf);
-        matches.push(...matchFlyer(terms, campaign, lines));
+        try {
+          const lines = await pdfLines(pdf);
+          matches.push(...matchFlyer(terms, campaign, lines));
+        } catch (error) {
+          errors.push(`${campaign.title}: ${error.message || error}`);
+        }
       }
     });
-    return {campaigns: campaigns.map(({pdfs, ...rest}) => rest), matches};
+    return {campaigns: campaigns.map(({pdfs, ...rest}) => rest), matches, errors};
   })().catch(error => ({error: String(error.message || error), campaigns: [], matches: []}));
 
   const body = {
