@@ -104,12 +104,12 @@ function purchaseFromDoc(snapshot) {
 }
 
 // Primeira vez: cria a lista inicial no Firestore (apenas uma vez).
-async function seed() {
-  if (seeded) return;
+async function seed(force = false) {
+  if (seeded && !force) return;
   seeded = true;
   try {
     const meta = doc(db, "config", "lista");
-    if ((await getDoc(meta)).exists()) return;
+    if (!force && (await getDoc(meta)).exists()) return;
     const batch = writeBatch(db);
     let order = 0;
     initial.forEach((names, category) => names.forEach(name => {
@@ -260,6 +260,16 @@ function render() {
     $("list").append(section);
   });
 
+  if (!items.length) {
+    const load = el("button", "add", "Carregar minha lista padrão");
+    load.type = "button";
+    load.onclick = () => {
+      load.disabled = true;
+      load.textContent = "Carregando…";
+      seed(true);
+    };
+    $("list").append(load);
+  }
   if (!visible.length) {
     $("list").append(el("p", "empty",
       !items.length ? "Sua lista está vazia. Acrescente o primeiro produto."
