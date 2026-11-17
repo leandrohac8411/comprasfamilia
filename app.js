@@ -58,7 +58,7 @@ const purchasesCol = collection(db, "compras");
 
 /* ---------- Estado ---------- */
 let items = [], purchases = [], filter = "all", editing = null, opener = null;
-let user = null, stops = [], seeded = false;
+let user = null, stops = [], seeded = false, pendingTimer = null;
 
 const who = email => {
   const key = String(email || "").toLowerCase();
@@ -128,9 +128,16 @@ function subscribe() {
     items = snap.docs.map(itemFromDoc).filter(item => item.name)
       .sort((a,b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
     if (snap.empty && !snap.metadata.fromCache) seed();
-    setSync(snap.metadata.hasPendingWrites ? "Salvando…"
-      : snap.metadata.fromCache ? "Sem conexão · as alterações serão enviadas quando voltar"
-      : "✓ Salvo na nuvem");
+    clearTimeout(pendingTimer);
+    if (snap.metadata.hasPendingWrites) {
+      setSync("Salvando…");
+      pendingTimer = setTimeout(() => setSync(
+        "⚠ Ainda não confirmado na nuvem. Verifique a internet; os dados estão guardados neste aparelho."), 15000);
+    } else {
+      setSync(snap.metadata.fromCache
+        ? "Sem conexão · as alterações serão enviadas quando voltar"
+        : "✓ Salvo na nuvem");
+    }
     render();
   }, failed));
 
@@ -466,22 +473,35 @@ function renderHistory() {
   purchases.forEach(purchase => {
     const details = el("details", "purchase");
     const summary = el("summary");
+    const products = purchase.items.length;
+    const units = purchase.items.reduce((sum, item) =>
+      sum + (Number.isFinite(item.quantity) ? item.quantity : 1), 0);
     const left = el("div");
     left.append(
       el("b", "", date(purchase.date) + (purchase.store ? " · " + purchase.store : "")),
-      el("small", "", `${purchase.items.length} ite${purchase.items.length === 1 ? "m" : "ns"} · por ${purchase.by}`)
+      el("small", "", `${products} produto${products === 1 ? "" : "s"} · ${number(units)} unidade${units === 1 ? "" : "s"} · por ${purchase.by}`)
     );
-    summary.append(left, el("strong", "", money(purchase.total)));
+    const right = el("div", "purchase-total");
+    right.append(el("strong", "", money(purchase.total)), el("span", "chevron", "›"));
+    summary.append(left, right);
+
     const ul = el("ul");
     purchase.items.forEach(item => {
       const li = el("li");
-      const qty = Number.isFinite(item.quantity) ? number(item.quantity) : "1";
-      li.append(
-        el("span", "", `${qty} × ${item.name}`),
-        el("span", "", item.price == null ? "sem preço" : money(item.subtotal || 0))
+      const qty = Number.isFinite(item.quantity) ? item.quantity : 1;
+      const info = el("div");
+      info.append(
+        el("b", "", item.name),
+        el("small", "", item.price == null
+          ? `${number(qty)} un. · sem preço`
+          : `${number(qty)} × ${money(item.price)}`)
       );
+      li.append(info, el("strong", "", item.price == null ? "—" : money(item.subtotal || 0)));
       ul.append(li);
     });
+    const totalRow = el("li", "purchase-sum");
+    totalRow.append(el("b", "", "Total"), el("strong", "", money(purchase.total)));
+    ul.append(totalRow);
     const remove = el("button", "remove", "Excluir este registro");
     remove.type = "button";
     remove.onclick = () => {
