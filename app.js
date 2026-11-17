@@ -71,8 +71,49 @@ if ("serviceWorker" in navigator) {
 }
 
 /* ---------- Estado ---------- */
-let items = [], purchases = [], filter = "all", editing = null, opener = null;
+let items = [], rawItems = [], purchases = [], filter = "all", editing = null, opener = null;
 let user = null, stops = [], seeded = false, pendingTimer = null;
+
+/* ---------- Mercado atual (fica salvo em cada aparelho) ---------- */
+let store = "";
+try { store = localStorage.getItem("mercado") || ""; } catch {}
+const storeKey = name => normalize(String(name || "")).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+// Preço que vale agora: o do mercado escolhido, se existir; senão o último preço geral.
+function applyStore(item) {
+  const own = store ? item.prices[storeKey(store)] : null;
+  return {
+    ...item,
+    price: own ? own.price : item.basePrice,
+    priceFrom: own ? store : item.priceStore,
+    priceIsOwn: !!own
+  };
+}
+function refreshItems() {
+  items = rawItems.map(applyStore);
+  render();
+}
+function knownStores() {
+  const map = new Map();
+  const add = name => {
+    const clean = String(name || "").trim();
+    if (clean && !map.has(storeKey(clean))) map.set(storeKey(clean), clean);
+  };
+  add(store);
+  purchases.forEach(p => add(p.store));
+  rawItems.forEach(item => Object.values(item.prices).forEach(p => add(p.name)));
+  return [...map.values()].sort((a,b) => a.localeCompare(b, "pt-BR"));
+}
+function setStore(name) {
+  store = String(name || "").trim();
+  try { store ? localStorage.setItem("mercado", store) : localStorage.removeItem("mercado"); } catch {}
+  updateStoreButton();
+  refreshItems();
+}
+function updateStoreButton() {
+  $("store-name").textContent = store || "Escolher mercado";
+  $("store-hint").textContent = store ? "Preços deste mercado" : "Para ver os preços de cada mercado";
+}
 
 const who = email => {
   const key = String(email || "").toLowerCase();
@@ -97,7 +138,11 @@ function itemFromDoc(snapshot) {
     category: Number.isInteger(x.category) && x.category >= 0 && x.category < categories.length ? x.category : 0,
     quantity: Number.isFinite(x.quantity) && x.quantity > 0 ? x.quantity : 1,
     unit: units[x.unit] ? x.unit : "un",
-    price: Number.isSafeInteger(x.price) && x.price >= 0 ? x.price : null,
+    basePrice: Number.isSafeInteger(x.price) && x.price >= 0 ? x.price : null,
+    priceStore: String(x.priceStore || ""),
+    prices: Object.fromEntries(Object.entries(x.prices && typeof x.prices === "object" ? x.prices : {})
+      .filter(([, p]) => Number.isSafeInteger(p?.price) && p.price >= 0)
+      .map(([key, p]) => [key, {price: p.price, name: String(p.name || key), at: p.at?.toDate?.() || null}])),
     checked: x.checked === true,
     order: Number.isFinite(x.order) ? x.order : 0,
     lastPrice: Number.isSafeInteger(x.lastPrice) ? x.lastPrice : null,
@@ -140,8 +185,9 @@ async function seed(force = false) {
 
 function subscribe() {
   stops.push(onSnapshot(itemsCol, {includeMetadataChanges:true}, snap => {
-    items = snap.docs.map(itemFromDoc).filter(item => item.name)
+    rawItems = snap.docs.map(itemFromDoc).filter(item => item.name)
       .sort((a,b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
+    items = rawItems.map(applyStore);
     if (snap.empty && !snap.metadata.fromCache) seed();
     clearTimeout(pendingTimer);
     if (snap.metadata.hasPendingWrites) {
@@ -162,8 +208,18 @@ function subscribe() {
   }, failed));
 }
 
+// Grava o preço também na tabela do mercado atual.
+function withStorePrice(data, storeName, at = Timestamp.now()) {
+  if (data.price === undefined) return data;
+  const name = String(storeName || "").trim();
+  const out = {...data, priceStore: name};
+  if (name && data.price !== null) {
+    out.prices = {[storeKey(name)]: {price: data.price, name, at}};
+  }
+  return out;
+}
 function saveItem(id, data) {
-  setDoc(doc(itemsCol, id), {...data, updatedBy: me(), updatedAt: serverTimestamp()}, {merge:true})
+  setDoc(doc(itemsCol, id), {...withStorePrice(data, store), updatedBy: me(), updatedAt: serverTimestamp()}, {merge:true})
     .catch(failed);
 }
 
@@ -177,13 +233,14 @@ onAuthStateChanged(auth, current => {
   $("footer").hidden = !user;
   document.querySelectorAll("dialog[open]").forEach(dialog => dialog.close());
   if (!user) {
-    items = []; purchases = []; seeded = false;
+    items = []; rawItems = []; purchases = []; seeded = false;
     if (!configured) {
       $("login-error").textContent = "Configure o arquivo firebase-config.js antes de entrar.";
     }
     return;
   }
   $("hello").textContent = "Olá, " + me() + "!";
+  updateStoreButton();
   setSync("Conectando…");
   render();
   subscribe();
@@ -272,7 +329,8 @@ function render() {
       check.onclick = () => {
         saveItem(item.id, {checked: !item.checked});
         // Marcou um item sem preço: já pergunta quanto custou.
-        if (!item.checked && item.price === null) openQuickPrice(item);
+        // Com mercado escolhido, também pergunta se ainda não há preço deste mercado.
+        if (!item.checked && (item.price === null || (store && !item.priceIsOwn))) openQuickPrice(item);
       };
 
       const edit = el("button", "edit");
@@ -284,7 +342,8 @@ function render() {
         el("b", "", item.name),
         el("small", "", item.price === null
           ? `${qtyText(item)} · Adicionar preço`
-          : `${qtyText(item)} × ${priceText(item)}`)
+          : `${qtyText(item)} × ${priceText(item)}` +
+            (store && !item.priceIsOwn ? ` · preço ${item.priceFrom ? "do " + item.priceFrom : "de outro mercado"}` : ""))
       );
       edit.append(text, el("span",
         item.price === null ? "pencil" : "amount",
@@ -359,6 +418,22 @@ function updateLastPrice(price) {
   }
   if (item?.updatedBy) parts.push(`Alterado por ${item.updatedBy}`);
   $("last-price").textContent = parts.join(" · ");
+  renderStorePrices(item, $("store-prices"));
+}
+// Comparativo do produto em cada mercado, do mais barato para o mais caro.
+function renderStorePrices(item, target) {
+  target.replaceChildren();
+  const list = Object.values(item?.prices || {}).sort((a,b) => a.price - b.price);
+  if (!list.length) return;
+  target.append(el("span", "store-prices-title", "Preço por mercado"));
+  list.forEach((p, index) => {
+    const row = el("span", "store-price" + (index === 0 && list.length > 1 ? " best" : ""));
+    row.append(
+      el("span", "", p.name + (storeKey(p.name) === storeKey(store) ? " (aqui)" : "")),
+      el("strong", "", money(p.price) + (index === 0 && list.length > 1 ? " ★" : ""))
+    );
+    target.append(row);
+  });
 }
 function openEditor(id = null) {
   opener = document.activeElement;
@@ -434,6 +509,9 @@ $("form").onsubmit = event => {
     quantity: Number($("quantity").value), unit: $("unit").value, price,
     checked: $("checked").checked
   };
+  // Abriu e salvou sem mexer num preço que veio de outro mercado: não grava como preço deste.
+  const current = items.find(item => item.id === editing);
+  if (current && store && !current.priceIsOwn && price === current.price) delete data.price;
   if (editing) saveItem(editing, data);
   else saveItem(doc(itemsCol).id, {...data, order: Date.now()});
   $("dialog").close();
@@ -447,6 +525,29 @@ $("remove").onclick = () => {
   }
 };
 
+/* ---------- Escolher mercado ---------- */
+$("store-button").onclick = () => {
+  const list = $("store-list");
+  list.replaceChildren();
+  const option = (label, value) => {
+    const button = el("button", "store-option" + (storeKey(value) === storeKey(store) ? " active" : ""), label);
+    button.type = "button";
+    button.onclick = () => { setStore(value); $("store-dialog").close(); };
+    list.append(button);
+  };
+  knownStores().forEach(name => option(name, name));
+  option("Nenhum (usar o último preço)", "");
+  $("new-store").value = "";
+  $("store-dialog").showModal();
+};
+$("store-form").onsubmit = event => {
+  event.preventDefault();
+  const name = $("new-store").value.trim();
+  if (!name) return;
+  setStore(name);
+  $("store-dialog").close();
+};
+
 /* ---------- Preço rápido (ao marcar item sem preço) ---------- */
 let quickId = null;
 function openQuickPrice(item) {
@@ -458,10 +559,12 @@ function openQuickPrice(item) {
   $("quick-qty").step = "any";
   $("quick-qty-label").textContent = `Quantidade (${units[unitOf(item)]})`;
   $("quick-price-label").textContent = priceLabel(unitOf(item));
+  $("quick-price").value = item.price != null ? (item.price / 100).toFixed(2).replace(".",",") : "";
   $("quick-price").placeholder = item.lastPrice != null
     ? (item.lastPrice / 100).toFixed(2).replace(".",",") : "0,00";
-  $("quick-last").textContent = item.lastPrice != null
-    ? `Última compra: ${money(item.lastPrice)}` + (item.lastBoughtAt ? ` em ${date(item.lastBoughtAt)}` : "") : "";
+  $("quick-last").textContent = (store ? `Mercado: ${store}. ` : "") + (item.lastPrice != null
+    ? `Última compra: ${money(item.lastPrice)}` + (item.lastBoughtAt ? ` em ${date(item.lastBoughtAt)}` : "") : "");
+  renderStorePrices(item, $("quick-store-prices"));
   updateQuickSubtotal();
   $("price-dialog").showModal();
   $("quick-price").focus();
@@ -504,7 +607,7 @@ $("finish").onclick = () => {
     ? `${missing} produto${missing === 1 ? " está" : "s estão"} sem preço e entra${missing === 1 ? "" : "m"} como R$ 0,00.` : "";
   const stores = [...new Set(purchases.map(p => p.store).filter(Boolean))];
   $("stores").replaceChildren(...stores.map(store => { const o = el("option"); o.value = store; return o; }));
-  $("store").value = purchases[0]?.store || "";
+  $("store").value = store || purchases[0]?.store || "";
   $("finish-dialog").showModal();
 };
 
@@ -513,10 +616,11 @@ $("finish-form").onsubmit = event => {
   const cart = items.filter(item => item.checked);
   if (!cart.length) { $("finish-dialog").close(); return; }
   const now = Timestamp.now();
+  const storeName = $("store").value.trim();
   const batch = writeBatch(db);
   batch.set(doc(purchasesCol), {
     date: now,
-    store: $("store").value.trim(),
+    store: storeName,
     by: me(),
     total: cart.reduce((sum,item) => sum + itemTotal(item), 0),
     items: cart.map(item => ({
@@ -525,11 +629,14 @@ $("finish-form").onsubmit = event => {
     }))
   });
   cart.forEach(item => {
-    const update = {checked:false, updatedBy: me(), updatedAt: serverTimestamp()};
-    if (item.price !== null) { update.lastPrice = item.price; update.lastBoughtAt = now; }
+    let update = {checked:false, updatedBy: me(), updatedAt: serverTimestamp()};
+    if (item.price !== null) {
+      update = withStorePrice({...update, price: item.price, lastPrice: item.price, lastBoughtAt: now}, storeName, now);
+    }
     batch.set(doc(itemsCol, item.id), update, {merge:true});
   });
   batch.commit().catch(failed);   // offline: fica na fila e envia depois
+  if (storeName && storeKey(storeName) !== storeKey(store)) setStore(storeName);
   $("finish-dialog").close();
 };
 

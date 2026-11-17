@@ -166,6 +166,33 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 .save {width:100%;padding:16px;background:var(--green);color:white;border:0;border-radius:13px;font-weight:650}
 .remove {display:block;margin:12px auto 0;padding:12px;background:none;border:0;color:var(--red);font-size:13px}
 .remove.skip {color:var(--muted)}
+
+/* Mercado */
+.store-button {
+  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  margin:0 0 14px; padding:12px 14px; border:1px solid #f6d3c6; border-radius:15px;
+  background:#fdf1ec;
+}
+.store-pin {
+  width:38px; height:38px; flex-shrink:0; display:grid; place-items:center;
+  border-radius:12px; background:#fc674c; color:white;
+}
+.store-pin svg {width:21px;height:21px}
+.store-text {flex:1;min-width:0}
+.store-text small {display:block;font-size:11px;color:var(--muted)}
+.store-text b {display:block;font-size:16px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.store-change {font-size:13px;font-weight:700;color:#d24c33}
+.store-list {display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.store-option {
+  min-height:48px; padding:12px 14px; text-align:left; font-size:15px;
+  border:1px solid #d8ddd2; border-radius:12px; background:white;
+}
+.store-option.active {border-color:var(--green);background:var(--green-light);font-weight:700}
+.store-prices {display:flex;flex-direction:column;gap:2px;margin:-4px 0 17px;font-size:13px}
+.store-prices:empty {display:none}
+.store-prices-title {font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.store-price {display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-radius:9px;background:#f4f3ee}
+.store-price.best {background:var(--green-light);color:var(--green)}
 .eyebrow {margin:0 0 4px;font-size:12px;font-weight:700;color:var(--green)}
 .warning {background:#fcece0;color:#7a3d1c;border-radius:12px;padding:12px 14px;font-size:13px;margin:0 0 17px}
 .summary-line {font-size:15px;margin:0 0 17px}
@@ -274,6 +301,14 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
     </div>
   </header>
 
+  <button type="button" class="store-button" id="store-button">
+    <span class="store-pin" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+    </span>
+    <span class="store-text"><small id="store-hint"></small><b id="store-name"></b></span>
+    <span class="store-change">Trocar</span>
+  </button>
+
   <label class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
       <circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>
@@ -335,11 +370,29 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
       <input id="price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
     </label>
     <p class="hint" id="last-price"></p>
+    <p class="store-prices" id="store-prices"></p>
 
     <div class="subtotal"><span>Subtotal</span><strong id="subtotal">—</strong></div>
     <label class="toggle"><input id="checked" type="checkbox">Já está no carrinho</label>
     <button class="save" type="submit">Salvar alterações</button>
     <button class="remove" id="remove" type="button">Excluir produto</button>
+  </form>
+</dialog>
+
+<!-- Escolher mercado -->
+<dialog id="store-dialog" aria-labelledby="store-title">
+  <form id="store-form" class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="store-title">Em qual mercado?</h2>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+    <p class="hint">A lista passa a mostrar os preços que vocês pagaram neste mercado.</p>
+    <div class="store-list" id="store-list"></div>
+    <label class="field">Outro mercado
+      <input id="new-store" maxlength="60" placeholder="Ex.: Assaí" autocomplete="off">
+    </label>
+    <button class="save" type="submit">Usar este mercado</button>
   </form>
 </dialog>
 
@@ -364,6 +417,7 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
       </label>
     </div>
     <p class="hint" id="quick-last"></p>
+    <p class="store-prices" id="quick-store-prices"></p>
     <div class="subtotal"><span>Subtotal</span><strong id="quick-subtotal">—</strong></div>
     <button class="save" type="submit">Salvar preço</button>
     <button class="remove skip" type="button" data-close>Pular por enquanto</button>
