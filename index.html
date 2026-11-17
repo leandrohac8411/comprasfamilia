@@ -35,11 +35,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   background:var(--bg); padding:30px 20px 240px;
 }
 header {display:flex; align-items:center; gap:13px; margin-bottom:26px}
-.logo {
-  width:48px; height:48px; flex-shrink:0; display:grid; place-items:center;
-  border-radius:16px; background:white; box-shadow:0 2px 10px #033f3e14;
+.head-brand {min-width:0}
+.head-brand h1 {margin:0;line-height:0}
+.head-brand img {height:56px;width:auto;max-width:100%}
+.hello {
+  margin:10px 0 0; font-size:21px; font-weight:750; letter-spacing:-.5px;
+  color:var(--green);
 }
-.logo img {width:36px;height:36px;object-fit:contain}
+header {align-items:flex-start}
+.actions {margin-top:6px}
 h1 {font-size:23px; letter-spacing:-.8px; margin:0 0 5px}
 .subtitle {margin:0;color:var(--muted);font-size:14px}
 .actions {margin-left:auto; display:flex; gap:6px}
@@ -250,8 +254,10 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 <!-- App -->
 <main class="app" id="main" hidden>
   <header>
-    <div class="logo" aria-hidden="true"><img src="img/icon.png" alt=""></div>
-    <div><h1>Minhas compras</h1><p class="subtitle" id="hello">Seu mercado, organizado.</p></div>
+    <div class="head-brand">
+      <h1><img src="img/logo.png" alt="Minhas compras" width="900" height="307"></h1>
+      <p class="hello" id="hello"></p>
+    </div>
     <div class="actions">
       <button type="button" class="icon-btn" id="open-history" aria-label="Histórico de compras" title="Histórico">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
