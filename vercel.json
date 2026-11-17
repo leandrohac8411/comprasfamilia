@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/ofertas.js": {"maxDuration": 30}
+  }
+}

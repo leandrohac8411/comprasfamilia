@@ -525,6 +525,154 @@ $("remove").onclick = () => {
   }
 };
 
+/* ---------- Ofertas de hoje (Atacadão + Dia a Dia) ---------- */
+const offersDefaults = {cep: "73082200", regiao: "DF", loja: "Sobradinho"};
+function offersConfig() {
+  try { return {...offersDefaults, ...JSON.parse(localStorage.getItem("ofertas") || "{}")}; }
+  catch { return {...offersDefaults}; }
+}
+const formatCep = cep => String(cep).replace(/\D/g, "").replace(/^(\d{5})(\d{3})$/, "$1-$2");
+
+function fillOffersForm() {
+  const cfg = offersConfig();
+  $("offers-cep").value = formatCep(cfg.cep);
+  $("offers-regiao").value = cfg.regiao;
+  $("offers-loja").value = cfg.loja;
+  $("offers-where").textContent =
+    `📍 CEP ${formatCep(cfg.cep) || "—"} · Dia a Dia ${cfg.regiao}${cfg.loja ? " · " + cfg.loja : ""} (alterar)`;
+}
+
+$("offers-button").onclick = () => {
+  fillOffersForm();
+  $("offers-dialog").showModal();
+  loadOffers();
+};
+$("offers-form").onsubmit = event => {
+  event.preventDefault();
+  const cfg = {
+    cep: $("offers-cep").value.replace(/\D/g, "").slice(0, 8),
+    regiao: $("offers-regiao").value,
+    loja: $("offers-loja").value.trim()
+  };
+  try { localStorage.setItem("ofertas", JSON.stringify(cfg)); } catch {}
+  fillOffersForm();
+  $("offers-dialog").querySelector("details").open = false;
+  loadOffers();
+};
+
+let offersRequest = 0;
+async function loadOffers() {
+  const body = $("offers-body");
+  const pending = items.filter(item => !item.checked);
+  const list = pending.length ? pending : items;
+  if (!list.length) {
+    body.replaceChildren(el("p", "offers-loading", "Sua lista está vazia."));
+    return;
+  }
+  const request = ++offersRequest;
+  body.replaceChildren(el("p", "offers-loading", `Procurando ofertas para ${list.length} ite${list.length === 1 ? "m" : "ns"}…`));
+  const cfg = offersConfig();
+  const params = new URLSearchParams({
+    itens: list.map(item => item.name).join("|"), cep: cfg.cep, regiao: cfg.regiao, loja: cfg.loja
+  });
+  try {
+    const response = await fetch("api/ofertas?" + params);
+    if (!response.ok) throw new Error(response.status === 404
+      ? "As ofertas só funcionam no site publicado (Vercel)." : "Erro " + response.status);
+    const data = await response.json();
+    if (request === offersRequest) renderOffers(data, list);
+  } catch (error) {
+    if (request === offersRequest) {
+      body.replaceChildren(el("p", "offers-loading", "Não foi possível buscar as ofertas. " + (error.message || "")));
+    }
+  }
+}
+
+function renderOffers(data, list) {
+  const body = $("offers-body");
+  body.replaceChildren();
+  const byName = new Map(list.map(item => [item.name, item]));
+
+  // Atacadão
+  const atc = el("section", "offers-section");
+  const atcTitle = el("h3", "", "Atacadão");
+  atcTitle.append(el("small", "", data.atacadao?.regional ? "preço online da sua região" : "preço online"));
+  atc.append(atcTitle, el("p", "offers-note",
+    "Preços do site do Atacadão. Podem ser diferentes na loja física. Toque para ver o produto."));
+  const rows = (data.atacadao?.items || []).map(entry => {
+    const best = entry.results.find(r => r.promo) || entry.results[0];
+    if (!best) return null;
+    const mine = byName.get(entry.term);
+    const cheaper = mine?.price != null && best.price < mine.price ? mine.price - best.price : 0;
+    return {entry, best, mine, cheaper, score: (best.promo ? 2 : 0) + (cheaper ? 1 : 0)};
+  }).filter(Boolean).sort((a,b) => b.score - a.score);
+  if (!rows.length) {
+    atc.append(el("p", "offers-note", data.atacadao?.error ? "Atacadão indisponível agora." : "Nada encontrado."));
+  }
+  rows.forEach(({entry, best, cheaper}) => {
+    const link = el("a", "offer");
+    link.href = best.link;
+    link.target = "_blank";
+    link.rel = "noopener";
+    if (best.image) {
+      const img = el("img");
+      img.src = best.image; img.alt = ""; img.loading = "lazy";
+      link.append(img);
+    }
+    const info = el("div", "offer-info");
+    info.append(el("small", "", entry.term), el("b", "", best.name));
+    if (cheaper) info.append(el("em", "cheaper", `${money(cheaper)} mais barato que o seu último preço`));
+    const price = el("div", "offer-price");
+    price.append(el("strong", "", money(best.price)));
+    if (best.promo) {
+      price.append(el("s", "", money(best.listPrice)));
+      price.append(el("span", "badge", `-${Math.round((1 - best.price / best.listPrice) * 100)}%`));
+    }
+    link.append(info, price);
+    atc.append(link);
+  });
+
+  // Dia a Dia
+  const dd = el("section", "offers-section");
+  const ddTitle = el("h3", "", "Dia a Dia");
+  ddTitle.append(el("small", "", "encartes da sua região"));
+  dd.append(ddTitle);
+  const campaigns = data.diaadia?.campaigns || [];
+  if (!campaigns.length) {
+    dd.append(el("p", "offers-note", data.diaadia?.error ? "Dia a Dia indisponível agora." : "Nenhum encarte ativo para a sua região."));
+  } else {
+    const flyers = el("div", "flyers");
+    campaigns.forEach(campaign => campaign.pages.forEach((page, index) => {
+      const link = el("a", "flyer");
+      link.href = page; link.target = "_blank"; link.rel = "noopener";
+      const img = el("img");
+      img.src = page; img.alt = ""; img.loading = "lazy";
+      link.append(img, campaign.title + (campaign.pages.length > 1 ? ` (${index + 1})` : ""));
+      flyers.append(link);
+    }));
+    dd.append(flyers);
+    const matches = data.diaadia.matches || [];
+    dd.append(el("p", "offers-note", matches.length
+      ? "Itens da sua lista que aparecem nos encartes. O preço está na imagem do encarte: toque para abrir."
+      : "Nenhum item da sua lista apareceu nos encartes de hoje."));
+    matches.forEach(match => {
+      const link = el("a", "offer");
+      link.href = match.page || match.link; link.target = "_blank"; link.rel = "noopener";
+      const info = el("div", "offer-info");
+      info.append(el("small", "", match.term), el("b", "", match.product), el("em", "", match.campaign));
+      const tag = el("div", "offer-price");
+      tag.append(el("span", "badge", "no encarte"));
+      link.append(info, tag);
+      dd.append(link);
+    });
+  }
+
+  const updated = data.updatedAt ? new Date(data.updatedAt) : null;
+  body.append(atc, dd, el("p", "offers-note",
+    "Consultas nos sites dos mercados, sem garantia de estoque." +
+    (updated ? ` Atualizado às ${updated.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"})}.` : "")));
+}
+
 /* ---------- Escolher mercado ---------- */
 $("store-button").onclick = () => {
   const list = $("store-list");

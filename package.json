@@ -1,0 +1,8 @@
+{
+  "name": "minhas-compras",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "unpdf": "1.9.1"
+  }
+}

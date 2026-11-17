@@ -167,6 +167,37 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 .remove {display:block;margin:12px auto 0;padding:12px;background:none;border:0;color:var(--red);font-size:13px}
 .remove.skip {color:var(--muted)}
 
+/* Ofertas */
+.offers-button {
+  width:100%; margin:0 0 14px; padding:13px 14px; border:0; border-radius:15px;
+  background:#fcca3b33; color:#7a4b00; font-weight:700; font-size:14px; text-align:left;
+}
+.offers-settings {margin:-6px 0 16px}
+.offers-settings summary {cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}
+.offers-settings form {padding-top:12px}
+.offers-section {margin:0 0 22px}
+.offers-section h3 {display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:17px;margin:0 0 4px}
+.offers-section h3 small {font-size:11px;font-weight:500;color:var(--muted)}
+.offers-note {font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+.offer {
+  display:flex; gap:12px; align-items:center; padding:10px 0;
+  border-bottom:1px solid var(--line); color:inherit; text-decoration:none;
+}
+.offer img {width:52px;height:52px;object-fit:contain;border-radius:10px;background:white;flex-shrink:0}
+.offer-info {flex:1;min-width:0}
+.offer-info small {display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.offer-info b {display:block;font-size:14px;margin-top:2px;overflow-wrap:anywhere}
+.offer-info em {display:block;font-style:normal;font-size:12px;margin-top:3px;color:var(--muted)}
+.offer-info em.cheaper {color:var(--green);font-weight:700}
+.offer-price {text-align:right;white-space:nowrap}
+.offer-price strong {display:block;color:var(--green);font-size:15px}
+.offer-price s {display:block;font-size:11px;color:var(--muted)}
+.badge {display:inline-block;margin-top:3px;padding:2px 7px;border-radius:20px;background:#fc674c;color:white;font-size:10px;font-weight:800}
+.flyers {display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.flyer {flex:0 0 120px;text-decoration:none;color:inherit;font-size:11px;line-height:1.3}
+.flyer img {display:block;width:120px;height:160px;object-fit:cover;border-radius:10px;background:#eee;margin-bottom:5px}
+.offers-loading {text-align:center;padding:30px 10px;color:var(--muted)}
+
 /* Mercado */
 .store-button {
   display:flex; align-items:center; gap:12px; width:100%; text-align:left;
@@ -308,6 +339,9 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
     <span class="store-text"><small id="store-hint"></small><b id="store-name"></b></span>
     <span class="store-change">Trocar</span>
   </button>
+  <button type="button" class="offers-button" id="offers-button">
+    <span aria-hidden="true">🔥</span> Ver ofertas de hoje para a minha lista
+  </button>
 
   <label class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -377,6 +411,38 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
     <button class="save" type="submit">Salvar alterações</button>
     <button class="remove" id="remove" type="button">Excluir produto</button>
   </form>
+</dialog>
+
+<!-- Ofertas -->
+<dialog id="offers-dialog" aria-labelledby="offers-title">
+  <div class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="offers-title">Ofertas de hoje</h2>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+    <details class="offers-settings">
+      <summary id="offers-where"></summary>
+      <form id="offers-form">
+        <div class="columns">
+          <label class="field">CEP (Atacadão)
+            <input id="offers-cep" inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code">
+          </label>
+          <label class="field">Estado (Dia a Dia)
+            <select id="offers-regiao">
+              <option value="DF">DF</option><option value="GO">GO</option>
+              <option value="TO">TO</option><option value="BA">BA</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">Loja do Dia a Dia (opcional)
+          <input id="offers-loja" maxlength="40" placeholder="Ex.: Sobradinho" autocomplete="off">
+        </label>
+        <button class="save" type="submit">Buscar de novo</button>
+      </form>
+    </details>
+    <div id="offers-body"></div>
+  </div>
 </dialog>
 
 <!-- Escolher mercado -->

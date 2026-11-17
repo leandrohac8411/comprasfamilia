@@ -2,3 +2,5 @@
 Thumbs.db
 .firebase/
 *.log
+node_modules/
+.vercel/
