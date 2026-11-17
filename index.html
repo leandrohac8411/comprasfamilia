@@ -165,6 +165,8 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 .toggle input {width:23px;height:23px;accent-color:var(--green)}
 .save {width:100%;padding:16px;background:var(--green);color:white;border:0;border-radius:13px;font-weight:650}
 .remove {display:block;margin:12px auto 0;padding:12px;background:none;border:0;color:var(--red);font-size:13px}
+.remove.skip {color:var(--muted)}
+.eyebrow {margin:0 0 4px;font-size:12px;font-weight:700;color:var(--green)}
 .warning {background:#fcece0;color:#7a3d1c;border-radius:12px;padding:12px 14px;font-size:13px;margin:0 0 17px}
 .summary-line {font-size:15px;margin:0 0 17px}
 .summary-line strong {color:var(--green)}
@@ -327,16 +329,44 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
           <button type="button" id="plus" aria-label="Aumentar quantidade">+</button>
         </div>
       </div>
-      <label class="field">Preço unitário (R$)
-        <input id="price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
-      </label>
+      <label class="field">Unidade<select id="unit"></select></label>
     </div>
+    <label class="field"><span id="price-label">Preço unitário (R$)</span>
+      <input id="price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    </label>
     <p class="hint" id="last-price"></p>
 
     <div class="subtotal"><span>Subtotal</span><strong id="subtotal">—</strong></div>
     <label class="toggle"><input id="checked" type="checkbox">Já está no carrinho</label>
     <button class="save" type="submit">Salvar alterações</button>
     <button class="remove" id="remove" type="button">Excluir produto</button>
+  </form>
+</dialog>
+
+<!-- Preço rápido -->
+<dialog id="price-dialog" aria-labelledby="price-title">
+  <form id="price-form" class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <div>
+        <p class="eyebrow">✓ No carrinho</p>
+        <h2 id="price-title">Quanto custou?</h2>
+      </div>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+    <p class="summary-line"><strong id="price-item"></strong></p>
+    <div class="columns">
+      <label class="field"><span id="quick-qty-label">Quantidade</span>
+        <input id="quick-qty" type="number" min="0.001" max="99999" step="any" inputmode="decimal" required>
+      </label>
+      <label class="field"><span id="quick-price-label">Preço (R$)</span>
+        <input id="quick-price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+      </label>
+    </div>
+    <p class="hint" id="quick-last"></p>
+    <div class="subtotal"><span>Subtotal</span><strong id="quick-subtotal">—</strong></div>
+    <button class="save" type="submit">Salvar preço</button>
+    <button class="remove skip" type="button" data-close>Pular por enquanto</button>
   </form>
 </dialog>
 

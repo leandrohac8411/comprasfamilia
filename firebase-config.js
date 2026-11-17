@@ -14,5 +14,5 @@ export const firebaseConfig = {
 // Use os MESMOS e-mails no arquivo firestore.rules.
 export const USERS = {
   "leandrohacarvalho@gmail.com": "Leandro",
-  "strandrade@gmail.com": "Esposa"
+  "strandrade@gmail.com": "Stephany"
 };

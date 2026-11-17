@@ -12,10 +12,19 @@ import { firebaseConfig, USERS } from "./firebase-config.js";
 const $ = id => document.getElementById(id);
 
 /* ---------- Dados fixos ---------- */
+// Os índices ficam gravados no banco: só ACRESCENTE categorias no final.
 const categories = [
   "Mercearia", "Bebidas e lanche", "Refrigerados e frios",
-  "Congelados", "Limpeza e lavanderia"
+  "Congelados", "Limpeza e lavanderia",
+  "Hortifrúti", "Carnes", "Padaria", "Higiene pessoal"
 ];
+// Ordem em que aparecem na tela (mais ou menos o caminho do mercado).
+const categoryOrder = [5, 7, 0, 6, 2, 3, 1, 4, 8];
+const units = {un:"un.", kg:"kg", L:"L", pct:"pct", cx:"cx", dz:"dz"};
+const unitNames = {un:"Unidade", kg:"Quilo (kg)", L:"Litro (L)", pct:"Pacote", cx:"Caixa", dz:"Dúzia"};
+const unitOf = item => units[item.unit] ? item.unit : "un";
+const qtyText = item => `${number(item.quantity)} ${units[unitOf(item)]}`;
+const priceText = item => money(item.price) + (unitOf(item) === "un" ? "" : "/" + units[unitOf(item)]);
 const initial = [
   ["Feijão","Arroz","Farinha de rosca","Sal","Açúcar","Tapioca",
    "Óleo","Leite condensado","Creme de leite"],
@@ -56,6 +65,11 @@ try {
 const itemsCol = collection(db, "itens");
 const purchasesCol = collection(db, "compras");
 
+/* ---------- Abrir sem internet ---------- */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(error => console.warn("SW:", error));
+}
+
 /* ---------- Estado ---------- */
 let items = [], purchases = [], filter = "all", editing = null, opener = null;
 let user = null, stops = [], seeded = false, pendingTimer = null;
@@ -82,6 +96,7 @@ function itemFromDoc(snapshot) {
     name: String(x.name || "").trim(),
     category: Number.isInteger(x.category) && x.category >= 0 && x.category < categories.length ? x.category : 0,
     quantity: Number.isFinite(x.quantity) && x.quantity > 0 ? x.quantity : 1,
+    unit: units[x.unit] ? x.unit : "un",
     price: Number.isSafeInteger(x.price) && x.price >= 0 ? x.price : null,
     checked: x.checked === true,
     order: Number.isFinite(x.order) ? x.order : 0,
@@ -114,7 +129,7 @@ async function seed(force = false) {
     let order = 0;
     initial.forEach((names, category) => names.forEach(name => {
       batch.set(doc(itemsCol), {
-        name, category, quantity:1, price:null, checked:false, order: order++,
+        name, category, quantity:1, unit:"un", price:null, checked:false, order: order++,
         updatedBy: me(), updatedAt: serverTimestamp()
       });
     }));
@@ -236,11 +251,11 @@ function render() {
   );
   $("list").replaceChildren();
 
-  categories.forEach((category, index) => {
+  categoryOrder.forEach(index => {
     const group = visible.filter(item => item.category === index);
     if (!group.length) return;
     const section = el("section", "category");
-    const title = el("h2", "", category);
+    const title = el("h2", "", categories[index]);
     title.append(el("span", "", group.length + (group.length === 1 ? " item" : " itens")));
     section.append(title);
 
@@ -254,7 +269,11 @@ function render() {
       const circle = el("span", "", "✓");
       circle.setAttribute("aria-hidden","true");
       check.append(circle);
-      check.onclick = () => saveItem(item.id, {checked: !item.checked});
+      check.onclick = () => {
+        saveItem(item.id, {checked: !item.checked});
+        // Marcou um item sem preço: já pergunta quanto custou.
+        if (!item.checked && item.price === null) openQuickPrice(item);
+      };
 
       const edit = el("button", "edit");
       edit.type = "button";
@@ -264,8 +283,8 @@ function render() {
       text.append(
         el("b", "", item.name),
         el("small", "", item.price === null
-          ? `${number(item.quantity)} un. · Adicionar preço`
-          : `${number(item.quantity)} × ${money(item.price)}`)
+          ? `${qtyText(item)} · Adicionar preço`
+          : `${qtyText(item)} × ${priceText(item)}`)
       );
       edit.append(text, el("span",
         item.price === null ? "pencil" : "amount",
@@ -299,20 +318,28 @@ function render() {
 }
 
 /* ---------- Editor ---------- */
-categories.forEach((name,index) => {
-  const option = el("option", "", name);
+categoryOrder.forEach(index => {
+  const option = el("option", "", categories[index]);
   option.value = index;
   $("category").append(option);
 });
+Object.entries(unitNames).forEach(([value, name]) => {
+  const option = el("option", "", name);
+  option.value = value;
+  $("unit").append(option);
+});
+const stepFor = unit => unit === "kg" ? 0.1 : 1;
+const priceLabel = unit => unit === "un" ? "Preço unitário (R$)" : `Preço por ${units[unit]} (R$)`;
 
-function parsePrice() {
-  const value = $("price").value.trim();
+function parsePrice(input = $("price")) {
+  const value = input.value.trim();
   if (!value) return null;
   if (!/^\d{1,7}([,.]\d{1,2})?$/.test(value)) return NaN;
   return Math.round(Number(value.replace(",",".")) * 100);
 }
 function updateSubtotal() {
   $("price").setCustomValidity("");
+  $("price-label").textContent = priceLabel($("unit").value);
   const price = parsePrice(), quantity = Number($("quantity").value);
   $("subtotal").textContent = price !== null && Number.isFinite(price) && quantity > 0
     ? money(Math.round(price * quantity)) : "—";
@@ -344,6 +371,7 @@ function openEditor(id = null) {
   $("name").value = item?.name || "";
   $("category").value = item?.category ?? 0;
   $("quantity").value = item?.quantity ?? 1;
+  $("unit").value = item ? unitOf(item) : "un";
   $("price").value = item?.price != null ? (item.price / 100).toFixed(2).replace(".",",") : "";
   $("checked").checked = item?.checked || false;
   $("remove").hidden = !item;
@@ -362,13 +390,16 @@ $("search").oninput = render;
 $("name").oninput = () => $("name").setCustomValidity("");
 $("price").oninput = updateSubtotal;
 $("quantity").oninput = updateSubtotal;
+$("unit").onchange = updateSubtotal;
 $("minus").onclick = () => {
-  const value = Number($("quantity").value) || 1;
-  $("quantity").value = Math.max(.001, Math.round((value - 1) * 1000) / 1000);
+  const step = stepFor($("unit").value);
+  const value = Number($("quantity").value) || step;
+  $("quantity").value = Math.max(.001, Math.round((value - step) * 1000) / 1000);
   updateSubtotal();
 };
 $("plus").onclick = () => {
-  $("quantity").value = Math.min(99999, Math.round(((Number($("quantity").value) || 0) + 1) * 1000) / 1000);
+  const step = stepFor($("unit").value);
+  $("quantity").value = Math.min(99999, Math.round(((Number($("quantity").value) || 0) + step) * 1000) / 1000);
   updateSubtotal();
 };
 document.querySelectorAll("[data-filter]").forEach(button => {
@@ -400,7 +431,7 @@ $("form").onsubmit = event => {
   if (!$("form").reportValidity()) return;
   const data = {
     name, category: Number($("category").value),
-    quantity: Number($("quantity").value), price,
+    quantity: Number($("quantity").value), unit: $("unit").value, price,
     checked: $("checked").checked
   };
   if (editing) saveItem(editing, data);
@@ -414,6 +445,48 @@ $("remove").onclick = () => {
     deleteDoc(doc(itemsCol, item.id)).catch(failed);
     $("dialog").close();
   }
+};
+
+/* ---------- Preço rápido (ao marcar item sem preço) ---------- */
+let quickId = null;
+function openQuickPrice(item) {
+  quickId = item.id;
+  $("price-form").reset();
+  $("quick-price").setCustomValidity("");
+  $("price-item").textContent = item.name;
+  $("quick-qty").value = item.quantity;
+  $("quick-qty").step = "any";
+  $("quick-qty-label").textContent = `Quantidade (${units[unitOf(item)]})`;
+  $("quick-price-label").textContent = priceLabel(unitOf(item));
+  $("quick-price").placeholder = item.lastPrice != null
+    ? (item.lastPrice / 100).toFixed(2).replace(".",",") : "0,00";
+  $("quick-last").textContent = item.lastPrice != null
+    ? `Última compra: ${money(item.lastPrice)}` + (item.lastBoughtAt ? ` em ${date(item.lastBoughtAt)}` : "") : "";
+  updateQuickSubtotal();
+  $("price-dialog").showModal();
+  $("quick-price").focus();
+}
+function updateQuickSubtotal() {
+  $("quick-price").setCustomValidity("");
+  const price = parsePrice($("quick-price")), quantity = Number($("quick-qty").value);
+  $("quick-subtotal").textContent = price !== null && Number.isFinite(price) && quantity > 0
+    ? money(Math.round(price * quantity)) : "—";
+}
+$("quick-price").oninput = updateQuickSubtotal;
+$("quick-qty").oninput = updateQuickSubtotal;
+$("price-form").onsubmit = event => {
+  event.preventDefault();
+  const price = parsePrice($("quick-price"));
+  if (Number.isNaN(price)) {
+    $("quick-price").setCustomValidity("Use um valor como 25,90, sem separador de milhar.");
+    $("quick-price").reportValidity();
+    return;
+  }
+  if (!$("price-form").reportValidity()) return;
+  const data = {quantity: Number($("quick-qty").value)};
+  if (price !== null) data.price = price;
+  if (quickId) saveItem(quickId, data);
+  $("price-dialog").close();
 };
 
 /* ---------- Finalizar compra ---------- */
@@ -448,7 +521,7 @@ $("finish-form").onsubmit = event => {
     total: cart.reduce((sum,item) => sum + itemTotal(item), 0),
     items: cart.map(item => ({
       name: item.name, category: categories[item.category],
-      quantity: item.quantity, price: item.price, subtotal: itemTotal(item)
+      quantity: item.quantity, unit: unitOf(item), price: item.price, subtotal: itemTotal(item)
     }))
   });
   cart.forEach(item => {
@@ -483,12 +556,13 @@ function renderHistory() {
     const details = el("details", "purchase");
     const summary = el("summary");
     const products = purchase.items.length;
-    const units = purchase.items.reduce((sum, item) =>
-      sum + (Number.isFinite(item.quantity) ? item.quantity : 1), 0);
+    // Itens pesados (kg/L) contam como 1 volume.
+    const pieces = purchase.items.reduce((sum, item) =>
+      sum + (["kg","L"].includes(item.unit) || !Number.isFinite(item.quantity) ? 1 : item.quantity), 0);
     const left = el("div");
     left.append(
       el("b", "", date(purchase.date) + (purchase.store ? " · " + purchase.store : "")),
-      el("small", "", `${products} produto${products === 1 ? "" : "s"} · ${number(units)} unidade${units === 1 ? "" : "s"} · por ${purchase.by}`)
+      el("small", "", `${products} produto${products === 1 ? "" : "s"} · ${number(pieces)} volume${pieces === 1 ? "" : "s"} · por ${purchase.by}`)
     );
     const right = el("div", "purchase-total");
     right.append(el("strong", "", money(purchase.total)), el("span", "chevron", "›"));
@@ -497,13 +571,16 @@ function renderHistory() {
     const ul = el("ul");
     purchase.items.forEach(item => {
       const li = el("li");
-      const qty = Number.isFinite(item.quantity) ? item.quantity : 1;
+      const entry = {
+        quantity: Number.isFinite(item.quantity) ? item.quantity : 1,
+        unit: item.unit, price: item.price ?? null
+      };
       const info = el("div");
       info.append(
         el("b", "", item.name),
-        el("small", "", item.price == null
-          ? `${number(qty)} un. · sem preço`
-          : `${number(qty)} × ${money(item.price)}`)
+        el("small", "", entry.price === null
+          ? `${qtyText(entry)} · sem preço`
+          : `${qtyText(entry)} × ${priceText(entry)}`)
       );
       li.append(info, el("strong", "", item.price == null ? "—" : money(item.subtotal || 0)));
       ul.append(li);
