@@ -138,6 +138,7 @@ function itemFromDoc(snapshot) {
     category: Number.isInteger(x.category) && x.category >= 0 && x.category < categories.length ? x.category : 0,
     quantity: Number.isFinite(x.quantity) && x.quantity > 0 ? x.quantity : 1,
     unit: units[x.unit] ? x.unit : "un",
+    product: String(x.product || "").trim(),
     basePrice: Number.isSafeInteger(x.price) && x.price >= 0 ? x.price : null,
     priceStore: String(x.priceStore || ""),
     prices: Object.fromEntries(Object.entries(x.prices && typeof x.prices === "object" ? x.prices : {})
@@ -218,8 +219,8 @@ function withStorePrice(data, storeName, at = Timestamp.now()) {
   }
   return out;
 }
-function saveItem(id, data) {
-  setDoc(doc(itemsCol, id), {...withStorePrice(data, store), updatedBy: me(), updatedAt: serverTimestamp()}, {merge:true})
+function saveItem(id, data, storeName = store) {
+  setDoc(doc(itemsCol, id), {...withStorePrice(data, storeName), updatedBy: me(), updatedAt: serverTimestamp()}, {merge:true})
     .catch(failed);
 }
 
@@ -338,8 +339,9 @@ function render() {
       edit.setAttribute("aria-label", "Editar " + item.name);
       edit.onclick = () => openEditor(item.id);
       const text = el("span", "item-text");
+      text.append(el("b", "", item.name));
+      if (item.product) text.append(el("small", "product", item.product));
       text.append(
-        el("b", "", item.name),
         el("small", "", item.price === null
           ? `${qtyText(item)} · Adicionar preço`
           : `${qtyText(item)} × ${priceText(item)}` +
@@ -444,6 +446,7 @@ function openEditor(id = null) {
   $("name").setCustomValidity("");
   $("dialog-title").textContent = item ? "Editar produto" : "Novo produto";
   $("name").value = item?.name || "";
+  $("product").value = item?.product || "";
   $("category").value = item?.category ?? 0;
   $("quantity").value = item?.quantity ?? 1;
   $("unit").value = item ? unitOf(item) : "un";
@@ -505,7 +508,7 @@ $("form").onsubmit = event => {
   }
   if (!$("form").reportValidity()) return;
   const data = {
-    name, category: Number($("category").value),
+    name, product: $("product").value.trim(), category: Number($("category").value),
     quantity: Number($("quantity").value), unit: $("unit").value, price,
     checked: $("checked").checked
   };
@@ -573,7 +576,8 @@ async function loadOffers() {
   body.replaceChildren(el("p", "offers-loading", `Procurando ofertas para ${list.length} ite${list.length === 1 ? "m" : "ns"}…`));
   const cfg = offersConfig();
   const params = new URLSearchParams({
-    itens: list.map(item => item.name).join("|"), cep: cfg.cep, regiao: cfg.regiao, loja: cfg.loja
+    // Se o item já tem produto escolhido, busca por ele (mais preciso).
+    itens: list.map(searchTerm).join("|"), cep: cfg.cep, regiao: cfg.regiao, loja: cfg.loja
   });
   try {
     const response = await fetch("api/ofertas?" + params);
@@ -588,17 +592,50 @@ async function loadOffers() {
   }
 }
 
+const searchTerm = item => item.product || item.name;
+const titleCase = text => text.toLowerCase().replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase());
+
+// Linha de oferta: tocar adiciona na lista; o ↗ abre no site/encarte.
+function offerRow({image, label, title, notes = [], priceBox, href, onApply, appliedText}) {
+  const row = el("div", "offer");
+  const main = el("button", "offer-main");
+  main.type = "button";
+  if (image) {
+    const img = el("img");
+    img.src = image; img.alt = ""; img.loading = "lazy";
+    main.append(img);
+  }
+  const info = el("span", "offer-info");
+  info.append(el("small", "", label), el("b", "", title));
+  notes.forEach(([text, className]) => info.append(el("em", className || "", text)));
+  const status = el("em", "offer-status", "Toque para usar na minha lista");
+  info.append(status);
+  main.append(info);
+  if (priceBox) main.append(priceBox);
+  main.onclick = () => {
+    onApply();
+    row.classList.add("added");
+    status.textContent = appliedText;
+  };
+  const open = el("a", "offer-open", "↗");
+  open.href = href; open.target = "_blank"; open.rel = "noopener";
+  open.setAttribute("aria-label", "Abrir " + title);
+  row.append(main, open);
+  return row;
+}
+
 function renderOffers(data, list) {
   const body = $("offers-body");
   body.replaceChildren();
-  const byName = new Map(list.map(item => [item.name, item]));
+  const byName = new Map();
+  list.forEach(item => { if (!byName.has(searchTerm(item))) byName.set(searchTerm(item), item); });
 
   // Atacadão
   const atc = el("section", "offers-section");
   const atcTitle = el("h3", "", "Atacadão");
   atcTitle.append(el("small", "", data.atacadao?.regional ? "preço online da sua região" : "preço online"));
   atc.append(atcTitle, el("p", "offers-note",
-    "Preços do site do Atacadão. Podem ser diferentes na loja física. Toque para ver o produto."));
+    "Preços do site do Atacadão (podem ser diferentes na loja). Toque no produto para usá-lo na sua lista com este preço; ↗ abre no site."));
   const rows = (data.atacadao?.items || []).map(entry => {
     const best = entry.results.find(r => r.promo) || entry.results[0];
     if (!best) return null;
@@ -609,27 +646,23 @@ function renderOffers(data, list) {
   if (!rows.length) {
     atc.append(el("p", "offers-note", data.atacadao?.error ? "Atacadão indisponível agora." : "Nada encontrado."));
   }
-  rows.forEach(({entry, best, cheaper}) => {
-    const link = el("a", "offer");
-    link.href = best.link;
-    link.target = "_blank";
-    link.rel = "noopener";
-    if (best.image) {
-      const img = el("img");
-      img.src = best.image; img.alt = ""; img.loading = "lazy";
-      link.append(img);
-    }
-    const info = el("div", "offer-info");
-    info.append(el("small", "", entry.term), el("b", "", best.name));
-    if (cheaper) info.append(el("em", "cheaper", `${money(cheaper)} mais barato que o seu último preço`));
-    const price = el("div", "offer-price");
+  rows.forEach(({entry, best, mine, cheaper}) => {
+    const price = el("span", "offer-price");
     price.append(el("strong", "", money(best.price)));
     if (best.promo) {
       price.append(el("s", "", money(best.listPrice)));
       price.append(el("span", "badge", `-${Math.round((1 - best.price / best.listPrice) * 100)}%`));
     }
-    link.append(info, price);
-    atc.append(link);
+    atc.append(offerRow({
+      image: best.image,
+      label: mine?.name || entry.term,
+      title: best.name,
+      notes: cheaper ? [[`${money(cheaper)} mais barato que o seu último preço`, "cheaper"]] : [],
+      priceBox: price,
+      href: best.link,
+      appliedText: `✓ Na lista: ${money(best.price)} no Atacadão`,
+      onApply: () => mine && saveItem(mine.id, {product: best.name, price: best.price}, "Atacadão")
+    }));
   });
 
   // Dia a Dia
@@ -653,17 +686,22 @@ function renderOffers(data, list) {
     dd.append(flyers);
     const matches = data.diaadia.matches || [];
     dd.append(el("p", "offers-note", matches.length
-      ? "Itens da sua lista que aparecem nos encartes. O preço está na imagem do encarte: toque para abrir."
+      ? "Itens da sua lista que aparecem nos encartes. Toque para usar o produto na sua lista; o preço está no encarte (↗)."
       : "Nenhum item da sua lista apareceu nos encartes de hoje."));
     matches.forEach(match => {
-      const link = el("a", "offer");
-      link.href = match.page || match.link; link.target = "_blank"; link.rel = "noopener";
-      const info = el("div", "offer-info");
-      info.append(el("small", "", match.term), el("b", "", match.product), el("em", "", match.campaign));
-      const tag = el("div", "offer-price");
+      const mine = byName.get(match.term);
+      const tag = el("span", "offer-price");
       tag.append(el("span", "badge", "no encarte"));
-      link.append(info, tag);
-      dd.append(link);
+      const product = titleCase(match.product);
+      dd.append(offerRow({
+        label: mine?.name || match.term,
+        title: product,
+        notes: [[match.campaign]],
+        priceBox: tag,
+        href: match.page || match.link,
+        appliedText: "✓ Produto definido na lista (confira o preço no encarte)",
+        onApply: () => mine && saveItem(mine.id, {product})
+      }));
     });
   }
 
@@ -772,7 +810,7 @@ $("finish-form").onsubmit = event => {
     by: me(),
     total: cart.reduce((sum,item) => sum + itemTotal(item), 0),
     items: cart.map(item => ({
-      name: item.name, category: categories[item.category],
+      name: item.product ? `${item.name} · ${item.product}` : item.name, category: categories[item.category],
       quantity: item.quantity, unit: unitOf(item), price: item.price, subtotal: itemTotal(item)
     }))
   });

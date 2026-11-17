@@ -179,10 +179,19 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 .offers-section h3 {display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:17px;margin:0 0 4px}
 .offers-section h3 small {font-size:11px;font-weight:500;color:var(--muted)}
 .offers-note {font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5}
-.offer {
-  display:flex; gap:12px; align-items:center; padding:10px 0;
-  border-bottom:1px solid var(--line); color:inherit; text-decoration:none;
+.offer {display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--line)}
+.offer-main {
+  flex:1; min-width:0; display:flex; gap:12px; align-items:center; padding:10px 4px;
+  border:0; background:none; text-align:left; border-radius:12px;
 }
+.offer.added .offer-main {background:var(--green-light)}
+.offer-status {color:#b4532f !important;font-weight:600}
+.offer.added .offer-status {color:var(--green) !important}
+.offer-open {
+  width:40px; height:40px; flex-shrink:0; display:grid; place-items:center;
+  border-radius:50%; background:#f0f1eb; color:var(--green); text-decoration:none; font-size:17px;
+}
+.item-text small.product {margin-top:3px;color:var(--ink);opacity:.75}
 .offer img {width:52px;height:52px;object-fit:contain;border-radius:10px;background:white;flex-shrink:0}
 .offer-info {flex:1;min-width:0}
 .offer-info small {display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
@@ -386,6 +395,9 @@ dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
 
     <label class="field">Produto
       <input id="name" required maxlength="100" placeholder="Nome do produto" autocomplete="off">
+    </label>
+    <label class="field">Marca / produto (opcional)
+      <input id="product" maxlength="120" placeholder="Ex.: Arroz Camil Tipo 1 5kg" autocomplete="off">
     </label>
     <label class="field">Categoria<select id="category"></select></label>
 
