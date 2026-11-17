@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#075232">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<title>Compras da família</title>
+<style>
+:root {
+  --green:#075232; --green-light:#edf4e9; --ink:#17291f;
+  --muted:#727970; --bg:#faf8f3; --line:#e7e9e1; --red:#9c4840;
+}
+* {box-sizing:border-box}
+[hidden] {display:none !important}
+body {
+  margin:0; background:#eeeae1; color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+button,input,select {font:inherit}
+button {cursor:pointer; touch-action:manipulation; color:inherit}
+button:disabled {opacity:.6; cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible {
+  outline:3px solid #73b38e; outline-offset:3px;
+}
+.app {
+  max-width:520px; min-height:100dvh; margin:auto;
+  background:var(--bg); padding:30px 20px 240px;
+}
+header {display:flex; align-items:center; gap:13px; margin-bottom:26px}
+.logo {
+  width:48px; height:48px; flex-shrink:0; display:grid; place-items:center;
+  border-radius:16px; background:var(--green-light); color:var(--green);
+}
+.logo svg {width:30px;height:30px}
+h1 {font-size:23px; letter-spacing:-.8px; margin:0 0 5px}
+.subtitle {margin:0;color:var(--muted);font-size:14px}
+.actions {margin-left:auto; display:flex; gap:6px}
+.icon-btn {
+  width:44px; height:44px; border:0; border-radius:50%;
+  background:#eeede7; color:var(--green); display:grid; place-items:center;
+}
+.icon-btn svg {width:21px;height:21px}
+.search {
+  display:flex; align-items:center; gap:10px;
+  background:#eeede7; border-radius:15px; padding:0 14px;
+}
+.search svg {width:20px;flex-shrink:0}
+.search input {
+  width:100%; border:0; background:transparent;
+  padding:16px 0; outline:none; font-size:16px; color:var(--ink);
+}
+.filters {display:flex;gap:8px;margin:20px 0}
+.filters button {
+  flex:1; min-height:43px; border-radius:24px;
+  border:1px solid #dedfd7; background:transparent; font-size:13px;
+}
+.filters button.active {background:var(--green);color:white;border-color:var(--green)}
+.progress-label {display:flex;justify-content:space-between;align-items:center}
+.progress-label strong {font-size:14px}
+.progress-label span {font-size:12px;color:var(--muted)}
+progress {
+  display:block; width:100%; height:6px; border:0;
+  border-radius:8px; overflow:hidden; margin:12px 0 25px;
+  background:#e5e8df; accent-color:var(--green);
+}
+progress::-webkit-progress-bar {background:#e5e8df}
+progress::-webkit-progress-value {background:var(--green);border-radius:8px}
+progress::-moz-progress-bar {background:var(--green)}
+.category {margin-bottom:22px}
+.category h2 {
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:15px; margin:0 0 8px; padding:13px 14px;
+  border-radius:12px; background:#eef1e6; color:var(--green);
+}
+.category h2 span {font-size:12px;font-weight:500;opacity:.7}
+.row {
+  display:flex; align-items:center; gap:12px; min-height:79px;
+  border-bottom:1px solid var(--line); padding:10px 9px;
+}
+.row.checked {background:var(--green-light);border-radius:12px;margin:5px 0;border-color:transparent}
+.check {
+  width:44px; height:44px; padding:7px; flex-shrink:0;
+  display:grid; place-items:center; background:none; border:0;
+}
+.check span {
+  width:27px; height:27px; display:grid; place-items:center;
+  border:1.8px solid #a8aea4; border-radius:50%; color:transparent;
+}
+.checked .check span {background:var(--green);border-color:var(--green);color:white}
+.edit {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; flex:1; min-width:0; text-align:left;
+  border:0; background:none; padding:5px 0; min-height:48px;
+}
+.item-text {min-width:0}
+.item-text b {display:block;font-size:15px;overflow-wrap:anywhere}
+.item-text small {display:block;font-size:12px;color:var(--muted);margin-top:6px}
+.amount {font-size:14px;font-weight:700;color:var(--green);white-space:nowrap}
+.pencil {font-size:22px;color:var(--green)}
+.add {
+  width:100%; padding:15px; border:1px solid var(--green);
+  border-radius:13px; background:transparent; color:var(--green);
+  font-weight:650; margin-top:4px;
+}
+.add span {font-size:23px;vertical-align:-1px;margin-right:8px}
+.empty {text-align:center;padding:35px 15px;color:var(--muted);line-height:1.6}
+footer {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:min(100%,520px); padding:12px 20px max(12px,env(safe-area-inset-bottom));
+  background:var(--bg); border-top:1px solid var(--line); z-index:2;
+}
+.total {
+  display:flex; justify-content:space-between; align-items:center;
+  gap:10px; background:var(--green); color:white; border-radius:17px;
+  padding:18px; box-shadow:0 6px 20px #07523218;
+}
+.total b {display:block;font-size:15px}
+.total small {display:block;margin-top:5px;opacity:.8;font-size:11px}
+.total strong {font-size:26px;letter-spacing:-.7px;white-space:nowrap}
+.finish {
+  width:100%; margin-top:10px; padding:14px; border:0; border-radius:13px;
+  background:#fcece0; color:var(--green); font-weight:700;
+}
+.estimate {font-size:11px;text-align:center;color:var(--muted);margin:10px 0 5px}
+#sync {font-size:10px;text-align:center;color:var(--muted);margin:0;line-height:1.4}
+dialog {
+  width:min(100%,520px); max-width:520px; max-height:92dvh;
+  margin:auto auto 0; padding:0; border:0;
+  border-radius:26px 26px 0 0; color:var(--ink);
+  background:#fffefa; box-shadow:0 -10px 60px #0002;
+}
+dialog::backdrop {background:#18241bb0;backdrop-filter:blur(3px)}
+.sheet {padding:12px 24px max(24px,env(safe-area-inset-bottom))}
+.handle {width:42px;height:5px;background:#d9ddd3;border-radius:10px;margin:0 auto 20px}
+.sheet-head {display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.sheet-head h2 {font-size:24px;letter-spacing:-.6px;margin:0}
+.close {width:44px;height:44px;border:0;background:#f0f1eb;border-radius:50%;font-size:26px}
+.field {display:block;margin-bottom:17px;font-size:13px;font-weight:600}
+.field input,.field select {
+  display:block;width:100%;min-height:49px;margin-top:8px;padding:12px;
+  border:1px solid #d8ddd2;border-radius:11px;background:white;color:var(--ink);font-size:16px;
+}
+.columns {display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stepper {display:flex;align-items:center;border:1px solid #d8ddd2;border-radius:11px;margin-top:8px;background:white}
+.stepper button {border:0;background:transparent;color:var(--green);height:48px;width:38px;font-size:24px;flex-shrink:0}
+.stepper input {border:0;margin:0;padding:10px 0;text-align:center;min-width:0;appearance:textfield}
+.stepper input::-webkit-inner-spin-button {appearance:none}
+.subtotal {display:flex;justify-content:space-between;padding:16px;background:#fcece0;border-radius:12px;margin:0 0 18px}
+.subtotal strong {color:var(--green)}
+.hint {font-size:12px;color:var(--muted);margin:-6px 0 17px;line-height:1.5}
+.hint:empty {display:none}
+.toggle {display:flex;align-items:center;gap:10px;min-height:44px;margin-bottom:17px;font-size:15px}
+.toggle input {width:23px;height:23px;accent-color:var(--green)}
+.save {width:100%;padding:16px;background:var(--green);color:white;border:0;border-radius:13px;font-weight:650}
+.remove {display:block;margin:12px auto 0;padding:12px;background:none;border:0;color:var(--red);font-size:13px}
+.warning {background:#fcece0;color:#7a3d1c;border-radius:12px;padding:12px 14px;font-size:13px;margin:0 0 17px}
+.summary-line {font-size:15px;margin:0 0 17px}
+.summary-line strong {color:var(--green)}
+
+/* Login */
+.login {display:flex;flex-direction:column;justify-content:center;padding-bottom:60px}
+.login header {flex-direction:column;text-align:center;margin-bottom:32px}
+.login .logo {width:64px;height:64px;border-radius:20px}
+.login .logo svg {width:38px;height:38px}
+.error {color:var(--red);font-size:13px;min-height:18px;margin:0 0 12px}
+
+/* Histórico */
+.stats {display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.stat {background:var(--green-light);border-radius:14px;padding:14px}
+.stat small {display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.stat strong {font-size:20px;color:var(--green);letter-spacing:-.4px}
+.purchase {border-bottom:1px solid var(--line)}
+.purchase summary {
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:14px 4px;cursor:pointer;list-style:none;
+}
+.purchase summary::-webkit-details-marker {display:none}
+.purchase summary b {display:block;font-size:15px}
+.purchase summary small {display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.purchase summary strong {color:var(--green);white-space:nowrap}
+.purchase ul {list-style:none;padding:0 4px 4px;margin:0}
+.purchase li {display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;color:var(--muted)}
+.purchase li span:last-child {white-space:nowrap}
+.purchase .remove {margin:0 0 6px auto}
+
+@media(min-width:600px) {
+  .app {margin:28px auto 0;border-radius:28px 28px 0 0;box-shadow:0 10px 70px #192d1910}
+  .login {min-height:calc(100dvh - 28px)}
+  dialog {margin:auto;border-radius:26px}
+}
+@media(prefers-reduced-motion:no-preference) {
+  button,.row {transition:background .15s ease}
+}
+</style>
+</head>
+<body>
+
+<!-- Tela de login -->
+<section class="app login" id="login" hidden>
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m8 9 4-6 4 6M3 9h18l-2 11H5L3 9ZM9 13v3m6-3v3"/>
+      </svg>
+    </div>
+    <div><h1>Compras da família</h1><p class="subtitle">Entre para ver a lista.</p></div>
+  </header>
+  <form id="login-form">
+    <label class="field">E-mail
+      <input id="login-email" type="email" required autocomplete="username" inputmode="email">
+    </label>
+    <label class="field">Senha
+      <input id="login-password" type="password" required autocomplete="current-password">
+    </label>
+    <p class="error" id="login-error" role="alert"></p>
+    <button class="save" type="submit" id="login-submit">Entrar</button>
+  </form>
+</section>
+
+<!-- App -->
+<main class="app" id="main" hidden>
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m8 9 4-6 4 6M3 9h18l-2 11H5L3 9ZM9 13v3m6-3v3"/>
+      </svg>
+    </div>
+    <div><h1>Compras da família</h1><p class="subtitle" id="hello">Seu mercado, organizado.</p></div>
+    <div class="actions">
+      <button type="button" class="icon-btn" id="open-history" aria-label="Histórico de compras" title="Histórico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>
+        </svg>
+      </button>
+      <button type="button" class="icon-btn" id="logout" aria-label="Sair" title="Sair">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <label class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>
+    </svg>
+    <input id="search" type="search" placeholder="Buscar produto" aria-label="Buscar produto">
+  </label>
+
+  <nav class="filters" aria-label="Filtrar produtos">
+    <button type="button" class="active" data-filter="all" aria-pressed="true">Todos</button>
+    <button type="button" data-filter="pending" aria-pressed="false">Pendentes</button>
+    <button type="button" data-filter="cart" aria-pressed="false">No carrinho</button>
+  </nav>
+
+  <div class="progress-label">
+    <strong id="count"></strong><span id="percent"></span>
+  </div>
+  <progress id="progress" aria-label="Progresso das compras" max="100" value="0"></progress>
+
+  <div id="list"></div>
+  <button type="button" class="add" id="add"><span aria-hidden="true">＋</span>Acrescentar item</button>
+</main>
+
+<footer id="footer" hidden>
+  <div class="total" role="status" aria-live="polite">
+    <div><b>Total no carrinho</b><small id="cart-info"></small></div>
+    <strong id="cart-total"></strong>
+  </div>
+  <button type="button" class="finish" id="finish" hidden>Finalizar compra e salvar no histórico</button>
+  <p class="estimate" id="estimate"></p>
+  <p id="sync">Conectando…</p>
+</footer>
+
+<!-- Editar produto -->
+<dialog id="dialog" aria-labelledby="dialog-title">
+  <form id="form" class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="dialog-title">Editar produto</h2>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+
+    <label class="field">Produto
+      <input id="name" required maxlength="100" placeholder="Nome do produto" autocomplete="off">
+    </label>
+    <label class="field">Categoria<select id="category"></select></label>
+
+    <div class="columns">
+      <div class="field">
+        <label for="quantity">Quantidade</label>
+        <div class="stepper">
+          <button type="button" id="minus" aria-label="Diminuir quantidade">−</button>
+          <input id="quantity" type="number" min="0.001" max="99999" step="any" inputmode="decimal" required value="1">
+          <button type="button" id="plus" aria-label="Aumentar quantidade">+</button>
+        </div>
+      </div>
+      <label class="field">Preço unitário (R$)
+        <input id="price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+      </label>
+    </div>
+    <p class="hint" id="last-price"></p>
+
+    <div class="subtotal"><span>Subtotal</span><strong id="subtotal">—</strong></div>
+    <label class="toggle"><input id="checked" type="checkbox">Já está no carrinho</label>
+    <button class="save" type="submit">Salvar alterações</button>
+    <button class="remove" id="remove" type="button">Excluir produto</button>
+  </form>
+</dialog>
+
+<!-- Finalizar compra -->
+<dialog id="finish-dialog" aria-labelledby="finish-title">
+  <form id="finish-form" class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="finish-title">Finalizar compra</h2>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+    <p class="summary-line" id="finish-summary"></p>
+    <p class="warning" id="finish-warning" hidden></p>
+    <label class="field">Onde vocês compraram? (opcional)
+      <input id="store" maxlength="60" list="stores" placeholder="Ex.: Atacadão" autocomplete="off">
+    </label>
+    <datalist id="stores"></datalist>
+    <p class="hint">Os itens marcados vão para o histórico e voltam para "Pendentes", com o preço guardado para a próxima vez.</p>
+    <button class="save" type="submit">Salvar no histórico</button>
+  </form>
+</dialog>
+
+<!-- Histórico -->
+<dialog id="history-dialog" aria-labelledby="history-title">
+  <div class="sheet">
+    <div class="handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="history-title">Histórico</h2>
+      <button class="close" type="button" data-close aria-label="Fechar">×</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><small>Este mês</small><strong id="month-total">—</strong></div>
+      <div class="stat"><small>Mês passado</small><strong id="last-month-total">—</strong></div>
+    </div>
+    <div id="history-list"></div>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

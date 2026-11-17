@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Só estes dois e-mails podem ler e gravar (em minúsculas).
+    // Mantenha igual à lista USERS do firebase-config.js.
+    function permitido() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'seu-email@exemplo.com',
+          'email-da-esposa@exemplo.com'
+        ];
+    }
+
+    match /{document=**} {
+      allow read, write: if permitido();
+    }
+  }
+}
