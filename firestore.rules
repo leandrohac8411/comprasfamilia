@@ -6,8 +6,8 @@ service cloud.firestore {
     function permitido() {
       return request.auth != null
         && request.auth.token.email in [
-          'seu-email@exemplo.com',
-          'email-da-esposa@exemplo.com'
+          'leandrohacarvalho@gmail.com',
+          'strandrade@gmail.com'
         ];
     }
 

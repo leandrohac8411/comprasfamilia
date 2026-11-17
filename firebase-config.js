@@ -13,6 +13,6 @@ export const firebaseConfig = {
 // E-mails que podem entrar (em minúsculas) e o nome que aparece no app.
 // Use os MESMOS e-mails no arquivo firestore.rules.
 export const USERS = {
-  "seu-email@exemplo.com": "Leandro",
-  "email-da-esposa@exemplo.com": "Esposa"
+  "leandrohacarvalho@gmail.com": "Leandro",
+  "strandrade@gmail.com": "Esposa"
 };
